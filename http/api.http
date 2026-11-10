@@ -72,3 +72,77 @@ GET {{baseUrl}}/api/products/999
 
 ### 15. Список категорий с подсчётом товаров
 GET {{baseUrl}}/api/categories
+
+### 16. Попытка создать товар под обычным покупателем (403 Forbidden)
+@customerToken = {{customerLogin.response.body.token}}
+POST {{baseUrl}}/api/products
+Authorization: Bearer {{customerToken}}
+Content-Type: application/json
+
+{
+  "title": "Forbidden Product",
+  "description": "Customer should not be able to create products",
+  "price": 99.99,
+  "images": [
+    "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800",
+    "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800",
+    "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800"
+  ]
+}
+
+### 17. Попытка создать товар с менее чем 3 картинками под админом (400 Validation Error)
+POST {{baseUrl}}/api/products
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "title": "Invalid Images Product",
+  "description": "Only two images provided instead of minimum three",
+  "price": 99.99,
+  "images": [
+    "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800",
+    "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800"
+  ]
+}
+
+### 18. Создание нового товара под администратором (201 Created)
+# @name createdProduct
+POST {{baseUrl}}/api/products
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "title": "Studio Condenser Microphone",
+  "description": "Broadcast-grade USB/XLR condenser microphone with ultra-low self-noise and built-in pop filter.",
+  "price": 199.99,
+  "discount": 15,
+  "rating": 4.8,
+  "reviews": 42,
+  "stock_quantity": 15,
+  "categoryCode": "AUDIO",
+  "images": [
+    "https://images.unsplash.com/photo-1590602847861-f357a9332bbc?w=1080",
+    "https://images.unsplash.com/photo-1590602847861-f357a9332bbc?w=1080",
+    "https://images.unsplash.com/photo-1590602847861-f357a9332bbc?w=1080"
+  ],
+  "features": ["Connection: USB-C & XLR", "Pattern: Cardioid", "Sample Rate: 96kHz/24-bit"],
+  "specifications": ["Connection: USB-C & XLR", "Pattern: Cardioid", "Frequency: 20Hz-20kHz"]
+}
+
+### 19. Редактирование созданного товара под администратором (200 OK)
+@newProductId = {{createdProduct.response.body.id}}
+PATCH {{baseUrl}}/api/products/{{newProductId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "price": 179.99,
+  "stock_quantity": 25
+}
+
+### 20. Мягкое удаление созданного товара под администратором (200 OK)
+DELETE {{baseUrl}}/api/products/{{newProductId}}
+Authorization: Bearer {{adminToken}}
+
+### 21. Проверка, что удалённый товар больше не отдаётся (404 Not Found)
+GET {{baseUrl}}/api/products/{{newProductId}}

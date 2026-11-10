@@ -1,7 +1,11 @@
 import type { Prisma } from '@prisma/client';
-import { notFound } from '../../lib/errors.js';
+import { badRequest, notFound } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
-import type { ListProductsQuery } from './products.schemas.js';
+import type {
+  CreateProductInput,
+  ListProductsQuery,
+  UpdateProductInput,
+} from './products.schemas.js';
 
 export interface ProductDto {
   id: number;
@@ -84,6 +88,41 @@ export const toProductDto = (product: ProductWithRelations): ProductDto => {
     created_at: createdIso,
     createdAt: createdIso,
   };
+};
+
+const slugify = (text: string): string => {
+  const base = text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return base.length > 0 ? base : `product-${String(Date.now())}`;
+};
+
+const buildUniqueSlug = async (baseSlug: string): Promise<string> => {
+  const existing = await prisma.product.findUnique({
+    where: { slug: baseSlug },
+    select: { id: true },
+  });
+
+  if (!existing) {
+    return baseSlug;
+  }
+
+  return `${baseSlug}-${String(Date.now())}`;
+};
+
+const resolveDiscountPrice = (
+  price: number,
+  discount: number,
+  explicitDiscountPrice: number | null | undefined,
+): number | null => {
+  if (explicitDiscountPrice !== undefined) {
+    return explicitDiscountPrice;
+  }
+  if (discount > 0) {
+    return Number((price * (1 - discount / 100)).toFixed(2));
+  }
+  return null;
 };
 
 const buildOrderBy = (
@@ -180,4 +219,155 @@ export const getProductById = async (id: number): Promise<ProductDto> => {
   }
 
   return toProductDto(product);
+};
+
+export const createProduct = async (input: CreateProductInput): Promise<ProductDto> => {
+  const category = await prisma.category.findUnique({
+    where: { code: input.categoryCode },
+  });
+
+  if (!category) {
+    throw badRequest(`Category with code '${input.categoryCode}' does not exist`);
+  }
+
+  const baseSlug = input.slug ?? slugify(input.title);
+  const slug = await buildUniqueSlug(baseSlug);
+  const discountPrice = resolveDiscountPrice(
+    input.price,
+    input.discount,
+    input.discountPrice,
+  );
+  const isDeal = input.isDeal ?? input.discount > 0;
+
+  const product = await prisma.product.create({
+    data: {
+      title: input.title,
+      slug,
+      description: input.description,
+      price: input.price.toFixed(2),
+      discount: input.discount,
+      discountPrice: discountPrice !== null ? discountPrice.toFixed(2) : null,
+      rating: input.rating,
+      reviews: input.reviews,
+      stockQuantity: input.stock_quantity,
+      isDeal,
+      features: input.features,
+      specifications: input.specifications,
+      categoryId: category.id,
+      images: {
+        create: input.images.map((url, index) => ({
+          url,
+          position: index,
+        })),
+      },
+    },
+    include: productInclude,
+  });
+
+  return toProductDto(product);
+};
+
+export const updateProduct = async (
+  id: number,
+  input: UpdateProductInput,
+): Promise<ProductDto> => {
+  const existing = await prisma.product.findFirst({
+    where: {
+      id,
+      deletedAt: null,
+    },
+  });
+
+  if (!existing) {
+    throw notFound('Product not found');
+  }
+
+  let categoryId: number | undefined;
+  if (input.categoryCode !== undefined) {
+    const category = await prisma.category.findUnique({
+      where: { code: input.categoryCode },
+    });
+
+    if (!category) {
+      throw badRequest(`Category with code '${input.categoryCode}' does not exist`);
+    }
+    categoryId = category.id;
+  }
+
+  const nextPrice = input.price ?? Number(existing.price);
+  const nextDiscount = input.discount ?? existing.discount;
+
+  let nextDiscountPrice: string | null | undefined;
+  if (input.discountPrice !== undefined) {
+    nextDiscountPrice =
+      input.discountPrice !== null ? input.discountPrice.toFixed(2) : null;
+  } else if (input.price !== undefined || input.discount !== undefined) {
+    const computed = resolveDiscountPrice(nextPrice, nextDiscount, undefined);
+    nextDiscountPrice = computed !== null ? computed.toFixed(2) : null;
+  }
+
+  const updated = await prisma.$transaction(async (tx) => {
+    if (input.images !== undefined) {
+      await tx.productImage.deleteMany({
+        where: { productId: id },
+      });
+
+      await tx.productImage.createMany({
+        data: input.images.map((url, index) => ({
+          productId: id,
+          url,
+          position: index,
+        })),
+      });
+    }
+
+    return tx.product.update({
+      where: { id },
+      data: {
+        ...(input.title !== undefined ? { title: input.title } : {}),
+        ...(input.description !== undefined ? { description: input.description } : {}),
+        ...(input.price !== undefined ? { price: input.price.toFixed(2) } : {}),
+        ...(input.discount !== undefined ? { discount: input.discount } : {}),
+        ...(nextDiscountPrice !== undefined ? { discountPrice: nextDiscountPrice } : {}),
+        ...(input.rating !== undefined ? { rating: input.rating } : {}),
+        ...(input.reviews !== undefined ? { reviews: input.reviews } : {}),
+        ...(input.stock_quantity !== undefined
+          ? { stockQuantity: input.stock_quantity }
+          : {}),
+        ...(input.isDeal !== undefined ? { isDeal: input.isDeal } : {}),
+        ...(input.features !== undefined ? { features: input.features } : {}),
+        ...(input.specifications !== undefined
+          ? { specifications: input.specifications }
+          : {}),
+        ...(categoryId !== undefined ? { categoryId } : {}),
+      },
+      include: productInclude,
+    });
+  });
+
+  return toProductDto(updated);
+};
+
+export const deleteProduct = async (id: number): Promise<void> => {
+  const existing = await prisma.product.findFirst({
+    where: {
+      id,
+      deletedAt: null,
+    },
+    select: { id: true },
+  });
+
+  if (!existing) {
+    throw notFound('Product not found');
+  }
+
+  await prisma.$transaction([
+    prisma.cartItem.deleteMany({
+      where: { productId: id },
+    }),
+    prisma.product.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    }),
+  ]);
 };
