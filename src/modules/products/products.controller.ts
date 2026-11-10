@@ -15,8 +15,9 @@ import {
 
 export const listProductsHandler: RequestHandler = async (req, res) => {
   const query = listProductsQuerySchema.parse(req.query);
-  const result = await listProducts(query);
-  res.status(200).json(result);
+  const { data, cacheStatus } = await listProducts(query);
+  res.setHeader('X-Cache', cacheStatus);
+  res.status(200).json(data);
 };
 
 export const getProductByIdHandler: RequestHandler = async (req, res) => {

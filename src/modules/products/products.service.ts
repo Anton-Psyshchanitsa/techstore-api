@@ -1,4 +1,10 @@
 import type { Prisma } from '@prisma/client';
+import {
+  buildCatalogCacheKey,
+  cacheGet,
+  cacheSet,
+  invalidateCatalogCache,
+} from '../../lib/cache.js';
 import { badRequest, notFound } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
 import type {
@@ -39,6 +45,11 @@ export interface PaginatedProductsResponse {
     current_page: number;
     limit: number;
   };
+}
+
+export interface CachedProductsResult {
+  data: PaginatedProductsResponse;
+  cacheStatus: 'HIT' | 'MISS';
 }
 
 export const productInclude = {
@@ -143,7 +154,17 @@ const buildOrderBy = (
 
 export const listProducts = async (
   query: ListProductsQuery,
-): Promise<PaginatedProductsResponse> => {
+): Promise<CachedProductsResult> => {
+  const cacheKey = await buildCatalogCacheKey(query);
+  const cached = await cacheGet<PaginatedProductsResponse>(cacheKey);
+
+  if (cached) {
+    return {
+      data: cached,
+      cacheStatus: 'HIT',
+    };
+  }
+
   const where: Prisma.ProductWhereInput = {
     deletedAt: null,
   };
@@ -194,7 +215,7 @@ export const listProducts = async (
 
   const totalPages = totalItems === 0 ? 0 : Math.ceil(totalItems / query.limit);
 
-  return {
+  const response: PaginatedProductsResponse = {
     items: products.map(toProductDto),
     meta: {
       total_items: totalItems,
@@ -202,6 +223,13 @@ export const listProducts = async (
       current_page: query.page,
       limit: query.limit,
     },
+  };
+
+  await cacheSet(cacheKey, response);
+
+  return {
+    data: response,
+    cacheStatus: 'MISS',
   };
 };
 
@@ -263,6 +291,8 @@ export const createProduct = async (input: CreateProductInput): Promise<ProductD
     },
     include: productInclude,
   });
+
+  await invalidateCatalogCache();
 
   return toProductDto(product);
 };
@@ -345,6 +375,8 @@ export const updateProduct = async (
     });
   });
 
+  await invalidateCatalogCache();
+
   return toProductDto(updated);
 };
 
@@ -370,4 +402,6 @@ export const deleteProduct = async (id: number): Promise<void> => {
       data: { deletedAt: new Date() },
     }),
   ]);
+
+  await invalidateCatalogCache();
 };
