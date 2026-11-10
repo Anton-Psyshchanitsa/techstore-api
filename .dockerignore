@@ -1,0 +1,13 @@
+node_modules
+dist
+coverage
+.git
+.gitignore
+.gitattributes
+.vscode
+.env
+.env.*
+!.env.example
+*.log
+http
+README.md
