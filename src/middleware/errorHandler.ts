@@ -1,4 +1,5 @@
 import type { ErrorRequestHandler } from 'express';
+import { MulterError } from 'multer';
 import { ZodError } from 'zod';
 import { AppError } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
@@ -13,6 +14,17 @@ export const errorHandler: ErrorRequestHandler = (err: unknown, _req, res, _next
           path: issue.path.join('.'),
           message: issue.message,
         })),
+      },
+    });
+    return;
+  }
+
+  if (err instanceof MulterError) {
+    res.status(400).json({
+      error: {
+        code: 'UPLOAD_ERROR',
+        message: err.message,
+        details: { field: err.field, code: err.code },
       },
     });
     return;

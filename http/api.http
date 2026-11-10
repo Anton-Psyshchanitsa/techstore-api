@@ -146,3 +146,7 @@ Authorization: Bearer {{adminToken}}
 
 ### 21. Проверка, что удалённый товар больше не отдаётся (404 Not Found)
 GET {{baseUrl}}/api/products/{{newProductId}}
+
+### 22. Проверка маршрута загрузки без файлов (400 Bad Request)
+POST {{baseUrl}}/api/uploads/images
+Authorization: Bearer {{adminToken}}
