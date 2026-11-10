@@ -10,6 +10,7 @@ import { cartRouter } from './modules/cart/cart.routes.js';
 import { categoriesRouter } from './modules/categories/categories.routes.js';
 import { productsRouter } from './modules/products/products.routes.js';
 import { uploadsRouter } from './modules/uploads/uploads.routes.js';
+import { docsRouter } from './routes/docs.js';
 import { healthRouter } from './routes/health.js';
 
 export const app: Express = express();
@@ -48,6 +49,7 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: '100kb' }));
 
 app.use('/health', healthRouter);
+app.use('/api', docsRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/products', productsRouter);
 app.use('/api/categories', categoriesRouter);
