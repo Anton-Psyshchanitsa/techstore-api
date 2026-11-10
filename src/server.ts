@@ -1,6 +1,7 @@
 import { app } from './app.js';
 import { env } from './config/env.js';
 import { logger } from './lib/logger.js';
+import { prisma } from './lib/prisma.js';
 
 const server = app.listen(env.PORT, () => {
   logger.info({ port: env.PORT, env: env.NODE_ENV }, 'API server started');
@@ -9,7 +10,9 @@ const server = app.listen(env.PORT, () => {
 const shutdown = (signal: NodeJS.Signals): void => {
   logger.info({ signal }, 'Shutting down');
   server.close(() => {
-    process.exit(0);
+    void prisma.$disconnect().finally(() => {
+      process.exit(0);
+    });
   });
 };
 
