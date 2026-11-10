@@ -150,3 +150,60 @@ GET {{baseUrl}}/api/products/{{newProductId}}
 ### 22. Проверка маршрута загрузки без файлов (400 Bad Request)
 POST {{baseUrl}}/api/uploads/images
 Authorization: Bearer {{adminToken}}
+
+
+### 23. Получение пустой корзины покупателя (200 OK)
+GET {{baseUrl}}/api/cart
+Authorization: Bearer {{customerToken}}
+
+### 24. Добавление товара ID=2 (Premium Wireless Headphones, цена со скидкой 239.99) в корзину (201 Created)
+# @name addedCartItem
+POST {{baseUrl}}/api/cart/items
+Authorization: Bearer {{customerToken}}
+Content-Type: application/json
+
+{
+  "productId": 2,
+  "quantity": 1
+}
+
+### 25. Изменение количества товара в корзине на 2 шт. (200 OK)
+@cartItemId = {{addedCartItem.response.body.items[0].id}}
+PATCH {{baseUrl}}/api/cart/items/{{cartItemId}}
+Authorization: Bearer {{customerToken}}
+Content-Type: application/json
+
+{
+  "quantity": 2
+}
+
+### 26. Попытка заказать больше остатка на складе (400 Bad Request, stock_quantity = 10)
+PATCH {{baseUrl}}/api/cart/items/{{cartItemId}}
+Authorization: Bearer {{customerToken}}
+Content-Type: application/json
+
+{
+  "quantity": 50
+}
+
+### 27. Применение промокода SAVE10 (скидка 10% после налога 8%) (200 OK)
+POST {{baseUrl}}/api/cart/apply-promo
+Authorization: Bearer {{customerToken}}
+Content-Type: application/json
+
+{
+  "code": "SAVE10"
+}
+
+### 28. Попытка применить неверный промокод (400 Bad Request)
+POST {{baseUrl}}/api/cart/apply-promo
+Authorization: Bearer {{customerToken}}
+Content-Type: application/json
+
+{
+  "code": "save10"
+}
+
+### 29. Удаление позиции из корзины (200 OK)
+DELETE {{baseUrl}}/api/cart/items/{{cartItemId}}
+Authorization: Bearer {{customerToken}}

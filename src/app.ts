@@ -6,6 +6,7 @@ import { logger } from './lib/logger.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { notFoundHandler } from './middleware/notFound.js';
 import { authRouter } from './modules/auth/auth.routes.js';
+import { cartRouter } from './modules/cart/cart.routes.js';
 import { categoriesRouter } from './modules/categories/categories.routes.js';
 import { productsRouter } from './modules/products/products.routes.js';
 import { uploadsRouter } from './modules/uploads/uploads.routes.js';
@@ -51,6 +52,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/products', productsRouter);
 app.use('/api/categories', categoriesRouter);
 app.use('/api/uploads', uploadsRouter);
+app.use('/api/cart', cartRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
