@@ -1,0 +1,50 @@
+@baseUrl = http://localhost:3000
+
+### 1. Проверка здоровья сервера и БД
+GET {{baseUrl}}/health
+
+### 2. Регистрация нового покупателя (201 Created)
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "newuser@techstore.local",
+  "password": "StrongPassword123!"
+}
+
+### 3. Повторная регистрация того же email (409 Conflict)
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "newuser@techstore.local",
+  "password": "StrongPassword123!"
+}
+
+### 4. Вход администратора (200 OK)
+# @name adminLogin
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@techstore.local",
+  "password": "AdminPassword123!"
+}
+
+### 5. Вход покупателя из seed (200 OK)
+# @name customerLogin
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "customer@techstore.local",
+  "password": "CustomerPassword123!"
+}
+
+### 6. Получение профиля по JWT-токену админа (200 OK)
+@adminToken = {{adminLogin.response.body.token}}
+GET {{baseUrl}}/api/auth/me
+Authorization: Bearer {{adminToken}}
+
+### 7. Попытка получить профиль без токена (401 Unauthorized)
+GET {{baseUrl}}/api/auth/me

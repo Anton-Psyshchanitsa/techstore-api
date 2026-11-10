@@ -5,6 +5,7 @@ import { env } from './config/env.js';
 import { logger } from './lib/logger.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { notFoundHandler } from './middleware/notFound.js';
+import { authRouter } from './modules/auth/auth.routes.js';
 import { healthRouter } from './routes/health.js';
 
 export const app: Express = express();
@@ -43,6 +44,7 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: '100kb' }));
 
 app.use('/health', healthRouter);
+app.use('/api/auth', authRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
