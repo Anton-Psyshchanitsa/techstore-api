@@ -48,3 +48,27 @@ Authorization: Bearer {{adminToken}}
 
 ### 7. Попытка получить профиль без токена (401 Unauthorized)
 GET {{baseUrl}}/api/auth/me
+
+### 8. Каталог: все товары с пагинацией по умолчанию
+GET {{baseUrl}}/api/products
+
+### 9. Каталог: пагинация (страница 2, по 2 товара) + сортировка по цене по возрастанию
+GET {{baseUrl}}/api/products?page=2&limit=2&sort_by=price&order=asc
+
+### 10. Каталог: регистронезависимый поиск по подстроке в title или description
+GET {{baseUrl}}/api/products?search=wireless
+
+### 11. Каталог: фильтр по диапазону цен, минимальному рейтингу и сортировке по названию
+GET {{baseUrl}}/api/products?min_price=200&max_price=2000&min_rating=4.5&sort_by=title&order=desc
+
+### 12. Каталог: фильтр по категории AUDIO
+GET {{baseUrl}}/api/products?category=AUDIO
+
+### 13. Получение одного товара по ID
+GET {{baseUrl}}/api/products/2
+
+### 14. Получение несуществующего товара (404 Not Found)
+GET {{baseUrl}}/api/products/999
+
+### 15. Список категорий с подсчётом товаров
+GET {{baseUrl}}/api/categories
