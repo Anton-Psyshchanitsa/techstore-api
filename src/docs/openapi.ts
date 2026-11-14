@@ -4,12 +4,16 @@ export const openApiSpec = {
     title: 'TechStore REST API',
     version: '1.0.0',
     description:
-      'E-commerce REST API built with Express 5, Prisma ORM (MySQL 8 / TiDB), Memcached, JWT RBAC, and Cloudinary.',
+      'REST API интернет-магазина TechStore (Вариант 1: Express + MySQL + Prisma + Memcached + Cloudinary).',
   },
   servers: [
     {
-      url: '/',
-      description: 'Current API server',
+      url: 'https://techstore-api-qu0b.onrender.com',
+      description: 'Production Server (Render)',
+    },
+    {
+      url: 'http://localhost:3000',
+      description: 'Local Development Server',
     },
   ],
   components: {
@@ -20,346 +24,135 @@ export const openApiSpec = {
         bearerFormat: 'JWT',
       },
     },
-    schemas: {
-      AuthCredentials: {
-        type: 'object',
-        required: ['email', 'password'],
-        properties: {
-          email: { type: 'string', format: 'email', example: 'customer@techstore.local' },
-          password: { type: 'string', example: 'CustomerPassword123!' },
-        },
-      },
-      ProductCreateInput: {
-        type: 'object',
-        required: ['title', 'description', 'price', 'images'],
-        properties: {
-          title: { type: 'string', example: 'Wireless Mechanical Keyboard' },
-          description: {
-            type: 'string',
-            example: 'Hot-swappable RGB mechanical keyboard with aluminum frame.',
-          },
-          price: { type: 'number', example: 159.99 },
-          discount: { type: 'integer', example: 10 },
-          rating: { type: 'number', example: 4.7 },
-          reviews: { type: 'integer', example: 54 },
-          stock_quantity: { type: 'integer', example: 15 },
-          categoryCode: { type: 'string', example: 'COMPUTERS' },
-          images: {
-            type: 'array',
-            minItems: 3,
-            items: { type: 'string', format: 'uri' },
-            example: [
-              'https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=1080',
-              'https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=1080',
-              'https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=1080',
-            ],
-          },
-          features: {
-            type: 'array',
-            items: { type: 'string' },
-            example: ['Switches: Tactile Brown', 'Battery: 200 hours'],
-          },
-          specifications: {
-            type: 'array',
-            items: { type: 'string' },
-            example: ['Layout: 75%', 'Connectivity: Bluetooth 5.1 & 2.4GHz'],
-          },
-        },
-      },
-      CartAddItemInput: {
-        type: 'object',
-        required: ['productId', 'quantity'],
-        properties: {
-          productId: { type: 'integer', example: 2 },
-          quantity: { type: 'integer', minimum: 1, maximum: 99, example: 1 },
-        },
-      },
-      CartUpdateItemInput: {
-        type: 'object',
-        required: ['quantity'],
-        properties: {
-          quantity: { type: 'integer', minimum: 1, maximum: 99, example: 2 },
-        },
-      },
-      ApplyPromoInput: {
-        type: 'object',
-        required: ['code'],
-        properties: {
-          code: { type: 'string', example: 'SAVE10' },
-        },
-      },
-    },
   },
   paths: {
     '/health': {
       get: {
         tags: ['System'],
-        summary: 'Healthcheck for API, MySQL, and Memcached',
+        summary: 'Проверка состояния сервера',
         responses: {
-          '200': { description: 'Service is healthy' },
+          '200': { description: 'Сервер работает' },
         },
       },
     },
     '/api/auth/register': {
       post: {
         tags: ['Auth'],
-        summary: 'Register a new customer account',
+        summary: 'Регистрация нового покупателя (Customer)',
         requestBody: {
           required: true,
           content: {
             'application/json': {
-              schema: { $ref: '#/components/schemas/AuthCredentials' },
+              schema: {
+                type: 'object',
+                required: ['email', 'password'],
+                properties: {
+                  email: { type: 'string', example: 'newuser@techstore.local' },
+                  password: { type: 'string', example: 'Password123!' },
+                },
+              },
             },
           },
         },
         responses: {
-          '201': { description: 'Customer registered and JWT returned' },
-          '409': { description: 'Email already registered' },
+          '201': { description: 'Пользователь зарегистрирован, возвращён JWT токен' },
+          '400': { description: 'Ошибка валидации' },
+          '409': { description: 'Email уже занят' },
         },
       },
     },
     '/api/auth/login': {
       post: {
         tags: ['Auth'],
-        summary: 'Authenticate user and issue JWT',
+        summary: 'Авторизация пользователя и получение JWT',
         requestBody: {
           required: true,
           content: {
             'application/json': {
-              schema: { $ref: '#/components/schemas/AuthCredentials' },
+              schema: {
+                type: 'object',
+                required: ['email', 'password'],
+                properties: {
+                  email: { type: 'string', example: 'customer@techstore.local' },
+                  password: { type: 'string', example: 'CustomerPassword123!' },
+                },
+              },
             },
           },
         },
         responses: {
-          '200': { description: 'JWT token and user profile' },
-          '401': { description: 'Invalid credentials' },
+          '200': { description: 'Успешный вход, возвращён JWT токен' },
+          '401': { description: 'Неверный логин или пароль' },
         },
       },
     },
     '/api/auth/me': {
       get: {
         tags: ['Auth'],
-        summary: 'Get current authenticated user profile',
+        summary: 'Профиль текущего пользователя',
         security: [{ bearerAuth: [] }],
         responses: {
-          '200': { description: 'Current user profile' },
-          '401': { description: 'Unauthorized' },
+          '200': { description: 'Данные текущего пользователя' },
+          '401': { description: 'Не авторизован' },
         },
       },
     },
     '/api/categories': {
       get: {
         tags: ['Categories'],
-        summary: 'List all categories with active product counts',
+        summary: 'Список всех категорий с количеством товаров',
         responses: {
-          '200': { description: 'Categories list' },
+          '200': { description: 'Список категорий' },
         },
       },
     },
     '/api/products': {
       get: {
         tags: ['Products'],
-        summary: 'List products with SQL filtering, search, sorting, pagination, and Memcached caching',
+        summary: 'Каталог товаров (поиск, фильтрация, сортировка, пагинация, кэш Memcached)',
         parameters: [
           { name: 'page', in: 'query', schema: { type: 'integer', default: 1 } },
           { name: 'limit', in: 'query', schema: { type: 'integer', default: 12 } },
-          { name: 'search', in: 'query', schema: { type: 'string' } },
+          { name: 'search', in: 'query', schema: { type: 'string' }, description: 'Поиск по названию или описанию' },
+          { name: 'category', in: 'query', schema: { type: 'string' }, description: 'Код категории (например, audio)' },
           { name: 'min_price', in: 'query', schema: { type: 'number' } },
           { name: 'max_price', in: 'query', schema: { type: 'number' } },
           { name: 'min_rating', in: 'query', schema: { type: 'number' } },
-          { name: 'category', in: 'query', schema: { type: 'string' } },
-          { name: 'is_deal', in: 'query', schema: { type: 'boolean' } },
-          { name: 'in_stock', in: 'query', schema: { type: 'boolean' } },
-          {
-            name: 'sort_by',
-            in: 'query',
-            schema: {
-              type: 'string',
-              enum: ['price', 'title', 'rating', 'created_at'],
-              default: 'created_at',
-            },
-          },
-          {
-            name: 'order',
-            in: 'query',
-            schema: { type: 'string', enum: ['asc', 'desc'], default: 'asc' },
-          },
+          { name: 'sort_by', in: 'query', schema: { type: 'string', enum: ['price', 'title', 'rating', 'created_at'] } },
+          { name: 'order', in: 'query', schema: { type: 'string', enum: ['asc', 'desc'] } },
         ],
         responses: {
           '200': {
-            description: 'Paginated product list with meta and X-Cache header',
+            description: 'Список товаров с метаданными пагинации и заголовком X-Cache (HIT / MISS)',
           },
         },
       },
       post: {
         tags: ['Products'],
-        summary: 'Create a new product (Admin only, invalidates catalog cache)',
+        summary: 'Создание нового товара (только Admin)',
         security: [{ bearerAuth: [] }],
         requestBody: {
           required: true,
           content: {
             'application/json': {
-              schema: { $ref: '#/components/schemas/ProductCreateInput' },
-            },
-          },
-        },
-        responses: {
-          '201': { description: 'Product created' },
-          '400': { description: 'Validation error (e.g., fewer than 3 images)' },
-          '403': { description: 'Forbidden (Admin role required)' },
-        },
-      },
-    },
-    '/api/products/{id}': {
-      get: {
-        tags: ['Products'],
-        summary: 'Get a single product by ID',
-        parameters: [
-          { name: 'id', in: 'path', required: true, schema: { type: 'integer' } },
-        ],
-        responses: {
-          '200': { description: 'Product details' },
-          '404': { description: 'Product not found' },
-        },
-      },
-      patch: {
-        tags: ['Products'],
-        summary: 'Update a product (Admin only, invalidates catalog cache)',
-        security: [{ bearerAuth: [] }],
-        parameters: [
-          { name: 'id', in: 'path', required: true, schema: { type: 'integer' } },
-        ],
-        requestBody: {
-          required: true,
-          content: {
-            'application/json': {
-              schema: { $ref: '#/components/schemas/ProductCreateInput' },
-            },
-          },
-        },
-        responses: {
-          '200': { description: 'Product updated' },
-          '403': { description: 'Forbidden' },
-          '404': { description: 'Product not found' },
-        },
-      },
-      delete: {
-        tags: ['Products'],
-        summary: 'Soft-delete a product (Admin only, invalidates catalog cache)',
-        security: [{ bearerAuth: [] }],
-        parameters: [
-          { name: 'id', in: 'path', required: true, schema: { type: 'integer' } },
-        ],
-        responses: {
-          '200': { description: 'Product soft-deleted' },
-          '403': { description: 'Forbidden' },
-          '404': { description: 'Product not found' },
-        },
-      },
-    },
-    '/api/cart': {
-      get: {
-        tags: ['Cart'],
-        summary: 'Get current user cart with 8% tax and promo discount summary',
-        security: [{ bearerAuth: [] }],
-        responses: {
-          '200': { description: 'User cart and calculated totals' },
-        },
-      },
-      delete: {
-        tags: ['Cart'],
-        summary: 'Clear all items from current user cart',
-        security: [{ bearerAuth: [] }],
-        responses: {
-          '200': { description: 'Empty cart' },
-        },
-      },
-    },
-    '/api/cart/items': {
-      post: {
-        tags: ['Cart'],
-        summary: 'Add product to cart (validates stock_quantity)',
-        security: [{ bearerAuth: [] }],
-        requestBody: {
-          required: true,
-          content: {
-            'application/json': {
-              schema: { $ref: '#/components/schemas/CartAddItemInput' },
-            },
-          },
-        },
-        responses: {
-          '201': { description: 'Updated cart' },
-          '400': { description: 'Insufficient stock or invalid quantity' },
-        },
-      },
-    },
-    '/api/cart/items/{id}': {
-      patch: {
-        tags: ['Cart'],
-        summary: 'Update cart item quantity',
-        security: [{ bearerAuth: [] }],
-        parameters: [
-          { name: 'id', in: 'path', required: true, schema: { type: 'integer' } },
-        ],
-        requestBody: {
-          required: true,
-          content: {
-            'application/json': {
-              schema: { $ref: '#/components/schemas/CartUpdateItemInput' },
-            },
-          },
-        },
-        responses: {
-          '200': { description: 'Updated cart' },
-        },
-      },
-      delete: {
-        tags: ['Cart'],
-        summary: 'Remove item from cart',
-        security: [{ bearerAuth: [] }],
-        parameters: [
-          { name: 'id', in: 'path', required: true, schema: { type: 'integer' } },
-        ],
-        responses: {
-          '200': { description: 'Updated cart' },
-        },
-      },
-    },
-    '/api/cart/apply-promo': {
-      post: {
-        tags: ['Cart'],
-        summary: 'Validate and apply promo code SAVE10 (10% discount)',
-        security: [{ bearerAuth: [] }],
-        requestBody: {
-          required: true,
-          content: {
-            'application/json': {
-              schema: { $ref: '#/components/schemas/ApplyPromoInput' },
-            },
-          },
-        },
-        responses: {
-          '200': { description: 'Promo applied and cart totals recalculated' },
-          '400': { description: 'Invalid promo code or empty cart' },
-        },
-      },
-    },
-    '/api/uploads/images': {
-      post: {
-        tags: ['Uploads'],
-        summary: 'Upload product images to Cloudinary (Admin only)',
-        security: [{ bearerAuth: [] }],
-        requestBody: {
-          required: true,
-          content: {
-            'multipart/form-data': {
               schema: {
                 type: 'object',
+                required: ['title', 'description', 'price', 'category', 'images'],
                 properties: {
+                  title: { type: 'string', example: 'Wireless Pro Keyboard' },
+                  description: { type: 'string', example: 'Mechanical wireless RGB keyboard' },
+                  price: { type: 'number', example: 199 },
+                  rating: { type: 'number', example: 4.8 },
+                  stock_quantity: { type: 'integer', example: 15 },
+                  category: { type: 'string', example: 'accessories' },
                   images: {
                     type: 'array',
-                    items: { type: 'string', format: 'binary' },
+                    items: { type: 'string' },
+                    example: [
+                      'https://res.cloudinary.com/demo/image/upload/sample.jpg',
+                      'https://res.cloudinary.com/demo/image/upload/sample.jpg',
+                      'https://res.cloudinary.com/demo/image/upload/sample.jpg',
+                    ],
                   },
                 },
               },
@@ -367,9 +160,185 @@ export const openApiSpec = {
           },
         },
         responses: {
-          '201': { description: 'Uploaded image URLs' },
+          '201': { description: 'Товар создан, кэш каталога сброшен' },
+          '401': { description: 'Не авторизован' },
+          '403': { description: 'Доступ запрещён (требуется роль admin)' },
+        },
+      },
+    },
+    '/api/products/{id}': {
+      get: {
+        tags: ['Products'],
+        summary: 'Получение товара по ID',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer', example: 1 } }],
+        responses: {
+          '200': { description: 'Детальная информация о товаре' },
+          '404': { description: 'Товар не найден' },
+        },
+      },
+      patch: {
+        tags: ['Products'],
+        summary: 'Редактирование товара (только Admin)',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer', example: 1 } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  title: { type: 'string' },
+                  price: { type: 'number' },
+                  stock_quantity: { type: 'integer' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'Товар обновлён, кэш каталога сброшен' },
+          '403': { description: 'Доступ запрещён (требуется роль admin)' },
+        },
+      },
+      delete: {
+        tags: ['Products'],
+        summary: 'Удаление товара — soft-delete + сброс кэша (только Admin)',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer', example: 1 } }],
+        responses: {
+          '200': { description: 'Товар помечен удалённым, кэш каталога сброшен' },
+          '403': { description: 'Доступ запрещён (требуется роль admin)' },
+        },
+      },
+    },
+    '/api/cart': {
+      get: {
+        tags: ['Cart'],
+        summary: 'Получить личную корзину пользователя',
+        security: [{ bearerAuth: [] }],
+        responses: {
+          '200': { description: 'Содержимое корзины и расчёт стоимости' },
+        },
+      },
+      delete: {
+        tags: ['Cart'],
+        summary: 'Очистить корзину',
+        security: [{ bearerAuth: [] }],
+        responses: {
+          '200': { description: 'Корзина очищена' },
+        },
+      },
+    },
+    '/api/cart/items': {
+      post: {
+        tags: ['Cart'],
+        summary: 'Добавить товар в корзину',
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['product_id', 'quantity'],
+                properties: {
+                  product_id: { type: 'integer', example: 1 },
+                  quantity: { type: 'integer', example: 1 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'Товар добавлен в корзину' },
+        },
+      },
+    },
+    '/api/cart/items/{id}': {
+      patch: {
+        tags: ['Cart'],
+        summary: 'Изменить количество товара в корзине',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer', example: 1 } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['quantity'],
+                properties: {
+                  quantity: { type: 'integer', example: 2 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'Количество обновлено' },
+        },
+      },
+      delete: {
+        tags: ['Cart'],
+        summary: 'Удалить позицию из корзины',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer', example: 1 } }],
+        responses: {
+          '200': { description: 'Позиция удалена из корзины' },
+        },
+      },
+    },
+    '/api/cart/apply-promo': {
+      post: {
+        tags: ['Cart'],
+        summary: 'Применить промокод (SAVE10 — скидка 10%)',
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['code'],
+                properties: {
+                  code: { type: 'string', example: 'SAVE10' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'Промокод применён, итоговая сумма пересчитана со скидкой 10%' },
+          '400': { description: 'Недействительный промокод' },
         },
       },
     },
   },
-} as const;
+};
+
+export function renderSwaggerHtml(): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TechStore API — Swagger Documentation</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.18.2/swagger-ui.css" />
+</head>
+<body style="margin:0;padding:0;">
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@5.18.2/swagger-ui-bundle.js"></script>
+  <script>
+    window.onload = function () {
+      window.ui = SwaggerUIBundle({
+        url: '/api/docs.json',
+        dom_id: '#swagger-ui',
+        deepLinking: true,
+        persistAuthorization: true
+      });
+    };
+  </script>
+</body>
+</html>`;
+}
