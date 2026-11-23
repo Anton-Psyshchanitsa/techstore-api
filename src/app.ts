@@ -12,6 +12,7 @@ import { productsRouter } from './modules/products/products.routes.js';
 import { uploadsRouter } from './modules/uploads/uploads.routes.js';
 import { docsRouter } from './routes/docs.js';
 import { healthRouter } from './routes/health.js';
+import { v2 as cloudinary } from 'cloudinary';
 
 export const app: Express = express();
 
@@ -58,3 +59,9 @@ app.use('/api/cart', cartRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});

@@ -56,44 +56,75 @@ export const listProductsQuerySchema = z
     }
   });
 
-export const createProductSchema = z.object({
-  title: z.string().trim().min(2).max(255),
-  slug: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Invalid slug format')
-    .max(255)
-    .optional(),
-  description: z.string().trim().min(10).max(5000),
-  price: z.coerce.number().positive('Price must be greater than 0').max(999999.99),
-  discount: z.coerce.number().int().min(0).max(90).default(0),
-  discountPrice: z.coerce.number().positive().max(999999.99).nullable().optional(),
-  rating: z.coerce.number().min(0).max(5).default(0),
-  reviews: z.coerce.number().int().min(0).default(0),
-  stock_quantity: z.coerce.number().int().min(0).default(10),
-  categoryCode: z.string().trim().toUpperCase().min(1).max(50).default('AUDIO'),
-  isDeal: z.boolean().optional(),
-  images: imagesArraySchema,
-  features: z.array(z.string().trim().min(1).max(255)).default([]),
-  specifications: z.array(z.string().trim().min(1).max(255)).default([]),
-});
+const specificationsSchema = z.union([
+  z.array(z.string().trim().min(1).max(255)),
+  z.record(z.string(), z.any()),
+]).default([]);
+
+export const createProductSchema = z
+  .object({
+    title: z.string().trim().min(2).max(255).optional(),
+    name: z.string().trim().min(2).max(255).optional(),
+    slug: z
+      .string()
+      .trim()
+      .toLowerCase()
+      .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Invalid slug format')
+      .max(255)
+      .optional(),
+    description: z.string().trim().min(5).max(5000),
+    price: z.coerce.number().positive('Price must be greater than 0').max(999999.99),
+    discount: z.coerce.number().int().min(0).max(90).default(0),
+    discountPrice: z.coerce.number().positive().max(999999.99).nullable().optional(),
+    discount_price: z.coerce.number().positive().max(999999.99).nullable().optional(),
+    rating: z.coerce.number().min(0).max(5).default(0),
+    reviews: z.coerce.number().int().min(0).default(0),
+    stock_quantity: z.coerce.number().int().min(0).default(10),
+    stockQuantity: z.coerce.number().int().min(0).optional(),
+    category: z.string().trim().toUpperCase().min(1).max(50).optional(),
+    categoryCode: z.string().trim().toUpperCase().min(1).max(50).optional(),
+    categoryId: z.coerce.number().int().positive().optional(),
+    category_id: z.coerce.number().int().positive().optional(),
+    isDeal: z.boolean().optional(),
+    is_deal: z.boolean().optional(),
+    images: imagesArraySchema,
+    features: z.array(z.string().trim().min(1).max(255)).default([]),
+    specifications: specificationsSchema,
+  })
+  .refine((data) => Boolean(data.title || data.name), {
+    message: 'Title is required',
+    path: ['title'],
+  });
 
 export const updateProductSchema = z
   .object({
     title: z.string().trim().min(2).max(255).optional(),
-    description: z.string().trim().min(10).max(5000).optional(),
+    name: z.string().trim().min(2).max(255).optional(),
+    slug: z
+      .string()
+      .trim()
+      .toLowerCase()
+      .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Invalid slug format')
+      .max(255)
+      .optional(),
+    description: z.string().trim().min(5).max(5000).optional(),
     price: z.coerce.number().positive('Price must be greater than 0').max(999999.99).optional(),
     discount: z.coerce.number().int().min(0).max(90).optional(),
     discountPrice: z.coerce.number().positive().max(999999.99).nullable().optional(),
+    discount_price: z.coerce.number().positive().max(999999.99).nullable().optional(),
     rating: z.coerce.number().min(0).max(5).optional(),
     reviews: z.coerce.number().int().min(0).optional(),
     stock_quantity: z.coerce.number().int().min(0).optional(),
+    stockQuantity: z.coerce.number().int().min(0).optional(),
+    category: z.string().trim().toUpperCase().min(1).max(50).optional(),
     categoryCode: z.string().trim().toUpperCase().min(1).max(50).optional(),
+    categoryId: z.coerce.number().int().positive().optional(),
+    category_id: z.coerce.number().int().positive().optional(),
     isDeal: z.boolean().optional(),
+    is_deal: z.boolean().optional(),
     images: imagesArraySchema.optional(),
     features: z.array(z.string().trim().min(1).max(255)).optional(),
-    specifications: z.array(z.string().trim().min(1).max(255)).optional(),
+    specifications: specificationsSchema.optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: 'At least one field must be provided for update',

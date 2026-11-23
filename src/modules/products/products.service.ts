@@ -24,6 +24,8 @@ export interface ProductDto {
   discount: number;
   category: string;
   categoryCode: string;
+  category_id?: number;
+  categoryId?: number;
   rating: number;
   reviews: number;
   images: string[];
@@ -32,7 +34,7 @@ export interface ProductDto {
   inStock: boolean;
   isDeal: boolean;
   features: string[];
-  specifications: string[];
+  specifications: unknown;
   created_at: string;
   createdAt: string;
 }
@@ -87,6 +89,8 @@ export const toProductDto = (product: ProductWithRelations): ProductDto => {
     discount: product.discount,
     category: product.category.name,
     categoryCode: product.category.code,
+    category_id: product.categoryId,
+    categoryId: product.categoryId,
     rating: product.rating,
     reviews: product.reviews,
     images: product.images.map((image) => image.url),
@@ -95,7 +99,7 @@ export const toProductDto = (product: ProductWithRelations): ProductDto => {
     inStock: product.stockQuantity > 0,
     isDeal: product.isDeal,
     features: toStringArray(product.features),
-    specifications: toStringArray(product.specifications),
+    specifications: product.specifications,
     created_at: createdIso,
     createdAt: createdIso,
   };
@@ -150,6 +154,14 @@ const buildOrderBy = (
     case 'created_at':
       return { createdAt: order };
   }
+};
+
+const resolveCategoryCode = (
+  input: Pick<CreateProductInput | UpdateProductInput, 'categoryCode'> & {
+    category?: string;
+  },
+): string | undefined => {
+  return input.categoryCode ?? input.category;
 };
 
 export const listProducts = async (
@@ -250,26 +262,53 @@ export const getProductById = async (id: number): Promise<ProductDto> => {
 };
 
 export const createProduct = async (input: CreateProductInput): Promise<ProductDto> => {
-  const category = await prisma.category.findUnique({
-    where: { code: input.categoryCode },
-  });
+  let categoryId: number | undefined;
 
-  if (!category) {
-    throw badRequest(`Category with code '${input.categoryCode}' does not exist`);
+  const rawCatId = input.categoryId ?? input.category_id;
+  if (rawCatId) {
+    const category = await prisma.category.findUnique({
+      where: { id: rawCatId },
+    });
+    if (category) {
+      categoryId = category.id;
+    }
   }
 
-  const baseSlug = input.slug ?? slugify(input.title);
+  if (!categoryId) {
+    const code = resolveCategoryCode(input);
+    if (code) {
+      const category = await prisma.category.findUnique({
+        where: { code: code.toUpperCase() },
+      });
+      if (category) {
+        categoryId = category.id;
+      }
+    }
+  }
+
+  if (!categoryId) {
+    const defaultCategory = await prisma.category.findFirst();
+    if (!defaultCategory) {
+      throw badRequest('No category found in database');
+    }
+    categoryId = defaultCategory.id;
+  }
+
+  const title = input.title || input.name || '';
+  const baseSlug = input.slug ?? slugify(title);
   const slug = await buildUniqueSlug(baseSlug);
+  const explicitDiscountPrice = input.discountPrice ?? input.discount_price;
   const discountPrice = resolveDiscountPrice(
     input.price,
     input.discount,
-    input.discountPrice,
+    explicitDiscountPrice,
   );
-  const isDeal = input.isDeal ?? input.discount > 0;
+  const isDeal = input.isDeal ?? input.is_deal ?? (input.discount > 0);
+  const stockQuantity = input.stockQuantity ?? input.stock_quantity;
 
   const product = await prisma.product.create({
     data: {
-      title: input.title,
+      title,
       slug,
       description: input.description,
       price: input.price.toFixed(2),
@@ -277,11 +316,11 @@ export const createProduct = async (input: CreateProductInput): Promise<ProductD
       discountPrice: discountPrice !== null ? discountPrice.toFixed(2) : null,
       rating: input.rating,
       reviews: input.reviews,
-      stockQuantity: input.stock_quantity,
+      stockQuantity,
       isDeal,
       features: input.features,
-      specifications: input.specifications,
-      categoryId: category.id,
+      specifications: input.specifications as Prisma.InputJsonValue,
+      categoryId,
       images: {
         create: input.images.map((url, index) => ({
           url,
@@ -313,28 +352,43 @@ export const updateProduct = async (
   }
 
   let categoryId: number | undefined;
-  if (input.categoryCode !== undefined) {
+  const rawCatId = input.categoryId ?? input.category_id;
+  if (rawCatId) {
     const category = await prisma.category.findUnique({
-      where: { code: input.categoryCode },
+      where: { id: rawCatId },
     });
-
-    if (!category) {
-      throw badRequest(`Category with code '${input.categoryCode}' does not exist`);
+    if (category) {
+      categoryId = category.id;
     }
-    categoryId = category.id;
+  } else {
+    const code = resolveCategoryCode(input);
+    if (code !== undefined) {
+      const category = await prisma.category.findUnique({
+        where: { code: code.toUpperCase() },
+      });
+      if (!category) {
+        throw badRequest(`Category with code '${code}' does not exist`);
+      }
+      categoryId = category.id;
+    }
   }
 
   const nextPrice = input.price ?? Number(existing.price);
   const nextDiscount = input.discount ?? existing.discount;
+  const explicitDiscountPrice = input.discountPrice ?? input.discount_price;
 
   let nextDiscountPrice: string | null | undefined;
-  if (input.discountPrice !== undefined) {
+  if (explicitDiscountPrice !== undefined) {
     nextDiscountPrice =
-      input.discountPrice !== null ? input.discountPrice.toFixed(2) : null;
+      explicitDiscountPrice !== null ? explicitDiscountPrice.toFixed(2) : null;
   } else if (input.price !== undefined || input.discount !== undefined) {
     const computed = resolveDiscountPrice(nextPrice, nextDiscount, undefined);
     nextDiscountPrice = computed !== null ? computed.toFixed(2) : null;
   }
+
+  const title = input.title ?? input.name;
+  const stockQuantity = input.stock_quantity ?? input.stockQuantity;
+  const isDeal = input.isDeal ?? input.is_deal;
 
   const updated = await prisma.$transaction(async (tx) => {
     if (input.images !== undefined) {
@@ -354,20 +408,19 @@ export const updateProduct = async (
     return tx.product.update({
       where: { id },
       data: {
-        ...(input.title !== undefined ? { title: input.title } : {}),
+        ...(title !== undefined ? { title } : {}),
+        ...(input.slug !== undefined ? { slug: input.slug } : {}),
         ...(input.description !== undefined ? { description: input.description } : {}),
         ...(input.price !== undefined ? { price: input.price.toFixed(2) } : {}),
         ...(input.discount !== undefined ? { discount: input.discount } : {}),
         ...(nextDiscountPrice !== undefined ? { discountPrice: nextDiscountPrice } : {}),
         ...(input.rating !== undefined ? { rating: input.rating } : {}),
         ...(input.reviews !== undefined ? { reviews: input.reviews } : {}),
-        ...(input.stock_quantity !== undefined
-          ? { stockQuantity: input.stock_quantity }
-          : {}),
-        ...(input.isDeal !== undefined ? { isDeal: input.isDeal } : {}),
+        ...(stockQuantity !== undefined ? { stockQuantity } : {}),
+        ...(isDeal !== undefined ? { isDeal } : {}),
         ...(input.features !== undefined ? { features: input.features } : {}),
         ...(input.specifications !== undefined
-          ? { specifications: input.specifications }
+          ? { specifications: input.specifications as Prisma.InputJsonValue }
           : {}),
         ...(categoryId !== undefined ? { categoryId } : {}),
       },
