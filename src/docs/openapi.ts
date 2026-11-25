@@ -212,6 +212,34 @@ export const openApiSpec = {
         },
       },
     },
+    '/api/products/upload-image': {
+      post: {
+        tags: ['Products'],
+        summary: 'Загрузка изображения товара в Cloudinary (только Admin)',
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'multipart/form-data': {
+              schema: {
+                type: 'object',
+                properties: {
+                  image: {
+                    type: 'string',
+                    format: 'binary',
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'Файл успешно загружен, возвращен URL' },
+          '400': { description: 'Файл не выбран или неверный формат' },
+          '403': { description: 'Доступ запрещён (требуется роль admin)' },
+        },
+      },
+    },
     '/api/cart': {
       get: {
         tags: ['Cart'],
